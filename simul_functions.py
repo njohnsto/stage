@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 def rndm(a, b, g, size=1):
     """Power-law gen for pdf(x)\propto x^{g-1} for a<=x<=b"""
@@ -23,7 +24,7 @@ def S_i_fit(cos, alpha, beta, f):
     return f*(alpha*x**2+beta*x+1)
 
 
-def get_random_vars(N):
+def get_random_vars(N,theta,S125):
     E0 = 10**15
     E1 = 10**18
     gamma = -2.5
@@ -37,12 +38,11 @@ def get_random_vars(N):
     E = rndm(E0, E1, gamma, N) 
     
     S_i_ref=S_ref(A,B,E)
-    cos_2 = np.random.rand(N)
-    S=S_i(a,b,c,cos_2,S_i_ref)
+    S=S_i(a,b,c,theta,S_i_ref)
     data=pd.DataFrame()
     data['E'] = E
     data['S_ref'] = S_i_ref
-    data['cos2'] = cos_2
+    data['cos2'] = theta
     data['S'] = S
     data['th'] = np.arccos(np.sqrt(data.cos2))
     data['lgE'] = np.log10(data.E)
