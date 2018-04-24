@@ -19,6 +19,7 @@ def get_signal_ref(A,B,energy):
 
 
 def get_s125(cos2, alpha, beta, signal_ref):
+    #function for computing s125
     cos_ref = np.cos(math.radians(38))**2
     x = cos2 - cos_ref
     return signal_ref*(1 + alpha*x + beta*x**2)
