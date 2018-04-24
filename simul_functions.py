@@ -4,6 +4,7 @@ import scipy as sp
 
 import math
 
+#functions needed for stage
 def random_pl(a, b, g, size=1):
     """Power-law gen for pdf(x)\propto x^{g-1} for a<=x<=b"""
     r = np.random.random(size=size)
