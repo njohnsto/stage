@@ -29,8 +29,8 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta):
     energy = random_pl(minE, maxE, gamma, events) 
     s38 = get_signal_ref(A, B, energy)
     cos2 = np.random.rand(events) 
-    
     s125 = get_s125(cos2, alpha, beta, s38)
+
     data=pd.DataFrame()
     data['energy'] = energy
     data['cos2'] = cos2
