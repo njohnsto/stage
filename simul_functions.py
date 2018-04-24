@@ -4,6 +4,7 @@ import scipy as sp
 
 import math
 
+#functions needed for stage
 def random_pl(a, b, g, size=1):
     """Power-law gen for pdf(x)\propto x^{g-1} for a<=x<=b"""
     r = np.random.random(size=size)
@@ -13,7 +14,7 @@ def random_pl(a, b, g, size=1):
 
 
 def get_signal_ref(A,B,energy):
-    return (energy/A)**(1/B)
+    return ( energy / A )**(1/B)
 
 
 
@@ -30,8 +31,8 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta):
     energy = random_pl(minE, maxE, gamma, events) 
     s38 = get_signal_ref(A, B, energy)
     cos2 = np.random.rand(events) 
-    
     s125 = get_s125(cos2, alpha, beta, s38)
+
     data=pd.DataFrame()
     data['energy'] = energy
     data['cos2'] = cos2
