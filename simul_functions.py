@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 import scipy as sp
+from scipy import optimize
 
+import matplotlib.pyplot as plt
 import math
 
 #functions needed for stage
@@ -81,9 +83,48 @@ def get_bootstrap_data(data):
     new_data.s125 = np.random.normal(data.s125.tolist(), data.s125_error.tolist())  
     return new_data
     
-    
-    
+def bootstrap_graphs(bootstrap_values):
+    bootstrap_val=np.asarray(bootstrap_values).transpose()
 
+    fig, axes=plt.subplots(nrows=2,ncols=3, figsize=(10,5))
+    ax0,ax1,ax2,ax3,ax4,ax5 =axes.flatten()
+    
+    ax0.hist(bootstrap_val[0], bins=10, normed=False)
+    ax0.set_title('alpha_bootstrap')
+    ax1.hist(bootstrap_val[1], bins=10, normed=False)
+    ax1.set_title('beta_bootstrap')
+    ax2.hist(bootstrap_val[2], bins=10, normed=False)
+    ax2.set_title('signal_ref_bootstrap')
+
+    ax3.plot(bootstrap_val[1],bootstrap_val[0],lw=0,marker='o')
+    ax3.set_xlabel('beta_bootstrap')
+    ax3.set_ylabel('alpha_bootstrap')
+    ax4.plot(bootstrap_val[2],bootstrap_val[0],lw=0,marker='o')
+    ax4.set_xlabel('signal_ref_bootstrap')
+    ax4.set_ylabel('alpha_bootstrap')
+    ax5.plot(bootstrap_val[2],bootstrap_val[1],lw=0,marker='o')
+    ax5.set_xlabel('signal_ref_bootstrap')
+    ax5.set_ylabel('beta_bootstrap')
+    fig.tight_layout()
+    plot=plt.figure()
+    plt.show()
+    return plot
+
+def rms_for_initial_vals(bootstrap_values, bootstrap_values_2):
+    values_array=np.asarray(bootstrap_values)
+    values_2=np.asarray(bootstrap_values_2)
+    values_array_T=values_array.transpose()
+    values_2_T=values_2.transpose()
+
+    mean_values=[]
+    sigma=[]
+    rms=[]
+    nb_columns=len(values_array_T)
+    for i in range(0,nb_columns):
+        mean_values.append(np.mean(values_array_T[i]))
+        rms.append(np.sqrt(np.sum(values_2_T[i])/len(values_2_T[i]))) 
+        sigma.append(np.sqrt(rms[i]**2-mean_values[i]**2))
+    return sigma
 
 def get_random_vars(N):
     E0 = 10**15
@@ -117,38 +158,4 @@ def get_random_vars(N):
     
     
     
-def get_random_vars2(N,theta,S125):
-    E0 = 10**15
-    E1 = 10**18
-    gamma = -2.5
 
-    A = 10**12
-    B = 1.2
-    b=0.919
-    a=-1.13
-    c=1
-
-    E = rndm(E0, E1, gamma, N) 
-    
-    S_i_ref=S_ref(A,B,E)
-    data=pd.DataFrame()
-    data['E'] = E
-    data['S_ref'] = S_i_ref
-    data['cos2'] = np.cos(theta)**2
-    data['S'] = S125
-    data['th'] = np.arccos(np.sqrt(data.cos2))
-    data['lgE'] = np.log10(data.E)
-    data['lgS'] = np.log10(data.S)
-    data['lgS_ref'] = np.log10(data.S_ref)
-    data = data.sort_values(['lgS'])
-    data['I'] = 0
-    bins = np.linspace(0, 1, 11, endpoint = True )
-    ind = np.digitize(data['cos2'],bins)
-    groups = data.groupby(ind)
-                      
-    for name, group in groups:
-        values = group['lgS'].apply(lambda x: group[group['lgS']>x].count())
-        data.loc[group.I.index.tolist(), 'I']= values.I 
-        
-    data['sqrt_I']=np.sqrt(data.I)
-    return data
