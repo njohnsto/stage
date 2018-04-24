@@ -51,6 +51,9 @@ def get_random_vars(N):
     data['lgS_ref'] = np.log10(data.S_ref)
     data = data.sort_values(['lgS'])
     data['I'] = 0
+    return data
+
+def intensity(data):
     bins = np.linspace(0, 1, 11, endpoint = True )
     ind = np.digitize(data['cos2'],bins)
     groups = data.groupby(ind)
@@ -60,8 +63,10 @@ def get_random_vars(N):
         data.loc[group.I.index.tolist(), 'I']= values.I 
         
     data['sqrt_I']=np.sqrt(data.I)
-    return data
-
+    return data.I
+    
+    
+    
 def get_random_vars2(N,theta,S125):
     E0 = 10**15
     E1 = 10**18
