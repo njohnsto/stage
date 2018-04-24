@@ -13,7 +13,7 @@ def random_pl(a, b, g, size=1):
 
 
 def get_signal_ref(A,B,energy):
-    return (energy/A)**(1/B)
+    return ( energy / A )**(1/B)
 
 
 
