@@ -38,6 +38,7 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta):
     data=pd.DataFrame()
     data['energy'] = energy
     data['cos2'] = cos2
+    data['s38'] = s38
     data['zenith'] = np.arccos(np.sqrt(data.cos2))
     data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
     data['s125'] = s125
@@ -67,36 +68,80 @@ def set_intensity(data, number_of_bins):
 def get_data_to_fit(data, intensity, nr_of_bins):
     bins = np.linspace(0.05,0.95, nr_of_bins, endpoint = True)
     val = data.loc[data.I == intensity]
-    s125_fit = val.s125.tolist()    
+    s125_fit = val.s125.tolist()
+    s38_fit=val.s38.tolist()
     # introduce checks for intensity 
-    return (s125_fit, bins)
+    return (s125_fit, bins, s38_fit )
 
 def get_attenuation_parameters(s125, cos2, performMCMC):
     parameters, cov2 =sp.optimize.curve_fit(get_s125, cos2, s125)
     if performMCMC:
         #implement MCMC with initial parameters from curve_fit
         print("Life is amazing")
-    return (parameters, cov2)    
+    return (parameters, cov2)
+
+def lnlike(parameters, cos2, y,f,yerr):
+    a,b=parameters
+    model = f*(b*cos2**2 + a*cos2+1)
+    return -0.5*np.sum((y-model)**2/yerr**2 + np.log(yerr**2))
+
+import scipy.optimize as op
+
+def lnprior(parameters):
+    a, b = theta
+    if -2.0<b<0. and 0.<a<1.5:
+        return 0.0
+    return -np.inf
+
+def lnprob(parameters, cos2, y,f, yerr):
+    lp = lnprior(parameters)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + lnlike(parameters,cos2,y,f,yerr)
+
+def get_attenuation_parameters2(s125_fit, bins, performMCMC):
+    parameters, cov2 =sp.optimize.curve_fit(get_s125, bins, s125_fit)
+    ndim, nwalkers = 2, 100
+    y=get_s125(bins, parameters[0],parameters[1], s38_fit)
+    data1=new_data.loc[new_data.s125==s125_fit]
+    error=data1.s125_error
+    nll = lambda *args: -lnlike(*args)
+    result= op.minimize(nll, parameters, args=(bins, y,s38_fit,error))
+    a_ml, b_ml= result["x"]
+    import emcee
+    if performMCMC:
+        #implement MCMC with initial parameters from curve_fit
+        #emcee
+        pos = [result['x']*np.random.randn(ndim) for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(bins,y,s38_fit,error))
+
+        sampler.run_mcmc(pos, 500)
+        samples= sampler.chain[:, 50:, :].reshape((-1,ndim))
+        print("Life is amazing")
+    return (parameters, cov2, samples)
         
 def get_bootstrap_data(data):
     new_data = data.copy()
     new_data.s125 = np.random.normal(data.s125.tolist(), data.s125_error.tolist())  
     return new_data
     
-def bootstrap_graphs(bootstrap_values):
+def bootstrap_graphs(bootstrap_values, alpha, beta):
     bootstrap_val=np.asarray(bootstrap_values).transpose()
 
     fig, axes=plt.subplots(nrows=2,ncols=3, figsize=(10,5))
     ax0,ax1,ax2,ax3,ax4,ax5 =axes.flatten()
     
     ax0.hist(bootstrap_val[0], bins=10, normed=False)
+    ax0.hist(alpha, bins=100, normed=False)
     ax0.set_title('alpha_bootstrap')
     ax1.hist(bootstrap_val[1], bins=10, normed=False)
+    ax1.hist(beta, bins=100, normed=False)
     ax1.set_title('beta_bootstrap')
     ax2.hist(bootstrap_val[2], bins=10, normed=False)
     ax2.set_title('signal_ref_bootstrap')
 
     ax3.plot(bootstrap_val[1],bootstrap_val[0],lw=0,marker='o')
+    ax3.plot(alpha,beta, lw=0, marker='o')
     ax3.set_xlabel('beta_bootstrap')
     ax3.set_ylabel('alpha_bootstrap')
     ax4.plot(bootstrap_val[2],bootstrap_val[0],lw=0,marker='o')
