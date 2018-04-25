@@ -105,8 +105,8 @@ def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMC
     ndim, nwalkers = 2, 100
     a2=parameters[0]
     b2=parameters[1]
-    alpha=0.919
-    beta=-1.13
+    #alpha=0.919
+    #beta=-1.13
     y=get_s125(bins, a2,b2, s38_fit)
     nll = lambda *args: -lnlike(*args)
     result= op.minimize(nll, [a2,b2], args=(bins, y,s38_fit,s125_fit_error))
@@ -121,8 +121,8 @@ def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMC
         sample= sampler.chain[:, 50:, :].reshape((-1,ndim))
         print("Life is amazing")
         for a, b in sample[np.random.randint(len(sample), size=100)]:
-            plt.plot(bins, s38_fit*(a*bins**2+b*bins+1), color="k", alpha=0.1)
-        plt.plot(bins, s38_fit*(beta*bins**2+alpha*bins+1), color="r", lw=2, alpha=0.8)
+            plt.plot(bins, s38_fit*(b*bins**2+a*bins+1), color="k", alpha=0.1)
+        plt.plot(bins, s38_fit*(b2*bins**2+a2*bins+1), color="r", lw=2, alpha=0.8)
         plt.errorbar(bins, y, yerr=s125_fit_error, fmt=".k")
         
     return (parameters, cov2, sample)
