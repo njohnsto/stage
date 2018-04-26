@@ -55,7 +55,8 @@ def get_positive_random(value, error):
 def set_intensity(data, number_of_bins):
     #function that calculates the intensity for each group  
     data = data.sort_values(['s125'])
-    bins = np.linspace(0, 1, number_of_bins, endpoint = True )
+    min_cos2 = data.cos2.min() 
+    bins = np.linspace(min_cos2, 1, number_of_bins, endpoint = True )
     ind = np.digitize(data['cos2'],bins)
     groups = data.groupby(ind)
                       
