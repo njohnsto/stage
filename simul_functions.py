@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 from scipy import optimize
-
+import scipy.optimize as op
 import matplotlib.pyplot as plt
 import math
 
@@ -32,15 +32,15 @@ def get_s125(cos2, alpha, beta, signal_ref):
 def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta):
     energy = random_pl(minE, maxE, gamma, events) 
     s38 = get_signal_ref(A, B, energy)
-    cos2 = np.random.rand(events) 
+    cos2 = np.random.uniform(0,np.cos(math.radians(50))**2, events)
     s125 = get_s125(cos2, alpha, beta, s38)
-
+    
     data=pd.DataFrame()
     data['energy'] = energy
     data['cos2'] = cos2
     data['s38'] = s38
-    data['zenith'] = np.arccos(np.sqrt(data.cos2))
-    data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
+    #data['zenith'] = np.arccos(np.sqrt(data.cos2))
+    #data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
     data['s125'] = s125
     data['s125_error'] = np.abs(np.random.uniform(0.05, 0.1, events)*s125)
     data['I'] = 0
@@ -62,7 +62,7 @@ def set_intensity(data, number_of_bins):
                       
     for name, group in groups:
         values = group['s125'].apply(lambda x: group[group['s125']>x].count())
-        data.loc[group.I.index.tolist(), 'I']= values.I 
+        data.loc[group.I.index.tolist(), 'I']= values.I
     return data
 
 
@@ -85,9 +85,7 @@ def get_attenuation_parameters(s125, cos2, performMCMC):
 def lnlike(params, cos2, y,f,yerr):
     a,b=params
     model = f*(b*cos2**2 + a*cos2+1)
-    return -0.5*np.sum((y-model)**2/yerr**2 + np.log(yerr**2))
-
-import scipy.optimize as op
+    return -0.5*np.sum((y-model)**2/(yerr**2) + np.log(yerr**2))
 
 def lnprior(params):
     a,b=params
@@ -104,18 +102,17 @@ def lnprob(params, cos2, y,f, yerr):
 def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMCMC):
     parameters, cov2 =sp.optimize.curve_fit(get_s125, bins, s125_fit)
     ndim, nwalkers = 2, 100
-    a2=parameters[0]
-    b2=parameters[1]
-    #alpha=0.919
-    #beta=-1.13
-    y=get_s125(bins, a2,b2, s38_fit)
+    a_true=parameters[0]
+    b_true=parameters[1]
+    y=get_s125(bins, a_true,b_true, s38_fit)
+    
     nll = lambda *args: -lnlike(*args)
-    result= op.minimize(nll, [a2,b2], args=(bins, y,s38_fit,s125_fit_error))
+    result= op.minimize(nll, [a_true,b_true], args=(bins, y,s38_fit,s125_fit_error))
     a_ml, b_ml= result["x"]
     import emcee
     if performMCMC:
         #emcee
-        pos = [result["x"]*np.random.randn(ndim) for i in range(nwalkers)]
+        pos = [result["x"]*np.random.randn(ndim)*10 for i in range(nwalkers)]
         sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(bins,y,s38_fit,s125_fit_error))
 
         sampler.run_mcmc(pos, 500)
@@ -123,7 +120,7 @@ def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMC
         print("Life is amazing")
         for a, b in sample[np.random.randint(len(sample), size=100)]:
             plt.plot(bins, s38_fit*(b*bins**2+a*bins+1), color="k", alpha=0.1)
-        plt.plot(bins, s38_fit*(b2*bins**2+a2*bins+1), color="r", lw=2, alpha=0.8)
+        plt.plot(bins, s38_fit*(b_true*bins**2+a_true*bins+1), color="r", lw=2, alpha=0.8)
         plt.errorbar(bins, y, yerr=s125_fit_error, fmt=".k")
         
     return (parameters, cov2, sample)
