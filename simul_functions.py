@@ -87,7 +87,7 @@ def get_attenuation_parameters(s125, cos2, performMCMC):
 def lnlike(params, cos2, y,yerr):
     a,b,f=params
     model = f*(b*cos2**2 + a*cos2+1)
-    return -0.5*np.sum((y-model)**2/(yerr**2) + np.log(yerr**2))
+    return -0.5*(np.sum((y-model)**2/(yerr**2) + np.log(yerr**2)))
 
 def lnprior(params):
     a,b,f=params
@@ -108,31 +108,32 @@ def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMC
     b_true=parameters[1]
     f_true= parameters[2]
     y=get_s125(bins, a_true,b_true, f_true)
-    
+    cos_ref = np.cos(math.radians(38))**2
+    cos2 = bins - cos_ref
     nll = lambda *args: -lnlike(*args)
-    result= op.minimize(nll, [a_true,b_true, f_true], args=(bins, y, s125_fit_error))
+    result= op.minimize(nll, [a_true,b_true, f_true], args=(cos2, y, s125_fit_error))
     a_ml, b_ml, f_ml= result["x"]
     print(result['x'])
     import emcee
     if performMCMC:
         #emcee
-        pos = [result["x"]*np.random.randn(ndim) for i in range(nwalkers)]
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(bins,y,s125_fit_error))
+        pos = [result['x']*np.random.randn(ndim) for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2,y,s125_fit_error))
 
         sampler.run_mcmc(pos, 5000)
         sample= sampler.chain[:,500:, :].reshape((-1,ndim))
         sample2=[]
         for i in range(0,5000-500): 
-            print(lnprior(sample[i]),sample[i],'outside if')
+            #print(lnprior(sample[i]),sample[i],'outside if')
             if lnprior(sample[i])!=-np.inf:
                 sample2.append(sample[i])
-                print(sample[i])
+            print(sample2[i])
             
         print("Life is amazing")
         for a, b,f in sample[np.random.randint(len(sample), size=100)]:
-            plt.plot(bins, f*(b*bins**2+a*bins+1), color="k", alpha=0.1)
-        plt.plot(bins, s38_fit*(b_true*bins**2+a_true*bins+1), color="r", lw=2, alpha=0.8)
-        plt.errorbar(bins, y, yerr=s125_fit_error, fmt=".k")
+            plt.plot(cos2, f*(b*cos2**2+a*cos2+1), color="k", alpha=0.1)
+        plt.plot(cos2, s38_fit*(b_true*cos2**2+a_true*cos2+1), color="r", lw=2, alpha=0.8)
+        plt.errorbar(cos2, y, yerr=s125_fit_error, fmt=".k")
         
     return (parameters, cov2, sample, sample2)
         
