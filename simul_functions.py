@@ -32,7 +32,7 @@ def get_s125(cos2, alpha, beta, signal_ref):
 def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta):
     energy = random_pl(minE, maxE, gamma, events) 
     s38 = get_signal_ref(A, B, energy)
-    cos2 = np.random.uniform(0,np.cos(math.radians(50))**2, events)
+    cos2 = np.random.uniform(np.cos(math.radians(50))**2,1, events)
     s125 = get_s125(cos2, alpha, beta, s38)
     
     data=pd.DataFrame()
@@ -67,13 +67,15 @@ def set_intensity(data, number_of_bins):
 
 
 def get_data_to_fit(data, intensity, nr_of_bins):
-    bins = np.linspace(0.05,0.95, nr_of_bins, endpoint = True)
+    min_cos2 = data.cos2.min()
+    bins = np.linspace(min_cos2, 1, nr_of_bins, endpoint = True )
+    bin_centers=np.diff(bins)/2+bins[0:-1]
     val = data.loc[data.I == intensity]
     s125_fit = np.asarray(val.s125.tolist())
     s38_fit=np.asarray(val.s38.tolist())
     s125_fit_error=np.asarray(val.s125_error.tolist())
     # introduce checks for intensity 
-    return (s125_fit, bins, s38_fit, s125_fit_error )
+    return (s125_fit,bin_centers, s38_fit, s125_fit_error )
 
 def get_attenuation_parameters(s125, cos2, performMCMC):
     parameters, cov2 =sp.optimize.curve_fit(get_s125, cos2, s125)
@@ -82,48 +84,57 @@ def get_attenuation_parameters(s125, cos2, performMCMC):
         print("Life is amazing")
     return (parameters, cov2)
 
-def lnlike(params, cos2, y,f,yerr):
-    a,b=params
+def lnlike(params, cos2, y,yerr):
+    a,b,f=params
     model = f*(b*cos2**2 + a*cos2+1)
     return -0.5*np.sum((y-model)**2/(yerr**2) + np.log(yerr**2))
 
 def lnprior(params):
-    a,b=params
-    if -2.0<b<0. and 0.<a<1.5:
+    a,b,f=params
+    if -2.0<b<0. and 0.<a<1.5 and 0.<f<10000:
         return 0.0
     return -np.inf
 
-def lnprob(params, cos2, y,f, yerr):
+def lnprob(params, cos2, y, yerr):
     lp = lnprior(params)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(params,cos2,y,f,yerr)
+    return lp + lnlike(params,cos2,y,yerr)
 
 def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMCMC):
     parameters, cov2 =sp.optimize.curve_fit(get_s125, bins, s125_fit)
-    ndim, nwalkers = 2, 100
+    ndim, nwalkers = 3, 100
     a_true=parameters[0]
     b_true=parameters[1]
-    y=get_s125(bins, a_true,b_true, s38_fit)
+    f_true= parameters[2]
+    y=get_s125(bins, a_true,b_true, f_true)
     
     nll = lambda *args: -lnlike(*args)
-    result= op.minimize(nll, [a_true,b_true], args=(bins, y,s38_fit,s125_fit_error))
-    a_ml, b_ml= result["x"]
+    result= op.minimize(nll, [a_true,b_true, f_true], args=(bins, y, s125_fit_error))
+    a_ml, b_ml, f_ml= result["x"]
+    print(result['x'])
     import emcee
     if performMCMC:
         #emcee
-        pos = [result["x"]*np.random.randn(ndim)*10 for i in range(nwalkers)]
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(bins,y,s38_fit,s125_fit_error))
+        pos = [result["x"]*np.random.randn(ndim) for i in range(nwalkers)]
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(bins,y,s125_fit_error))
 
-        sampler.run_mcmc(pos, 500)
-        sample= sampler.chain[:, 50:, :].reshape((-1,ndim))
+        sampler.run_mcmc(pos, 5000)
+        sample= sampler.chain[:,500:, :].reshape((-1,ndim))
+        sample2=[]
+        for i in range(0,5000-500): 
+            print(lnprior(sample[i]),sample[i],'outside if')
+            if lnprior(sample[i])!=-np.inf:
+                sample2.append(sample[i])
+                print(sample[i])
+            
         print("Life is amazing")
-        for a, b in sample[np.random.randint(len(sample), size=100)]:
-            plt.plot(bins, s38_fit*(b*bins**2+a*bins+1), color="k", alpha=0.1)
+        for a, b,f in sample[np.random.randint(len(sample), size=100)]:
+            plt.plot(bins, f*(b*bins**2+a*bins+1), color="k", alpha=0.1)
         plt.plot(bins, s38_fit*(b_true*bins**2+a_true*bins+1), color="r", lw=2, alpha=0.8)
         plt.errorbar(bins, y, yerr=s125_fit_error, fmt=".k")
         
-    return (parameters, cov2, sample)
+    return (parameters, cov2, sample, sample2)
         
 def get_bootstrap_data(data):
     new_data = data.copy()
