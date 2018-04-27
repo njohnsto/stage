@@ -4,17 +4,15 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 
-import matplotlib.pyplot as plt
 import math
 
-import scipy.optimize as op
 import emcee
 
 from utils import random_pl, get_signal_ref, get_s125
 from likelihood import lnlike, lnprior, lnprob
 
 
-def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, minTheta):
+def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
     """Function that generates simulated data given predefined input
 
     Parameters
@@ -35,7 +33,7 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, minTheta):
                 True attenuation coeff
     beta      : float
                 True attenuation coeff
-    minTheta  : float
+    maxTheta  : float
                 Minimum zenith value (degrees)
 
     Returns
@@ -46,7 +44,7 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, minTheta):
     # Random energy samples from power law
     energy = random_pl(minE, maxE, gamma, events)
     s38 = get_signal_ref(A, B, energy)
-    cos2 = np.random.uniform(np.cos(math.radians(minTheta))**2, 1, events)
+    cos2 = np.random.uniform(np.cos(math.radians(maxTheta))**2, 1, events)
     s125 = get_s125(cos2, alpha, beta, s38)
 
     # Define & fill pandas data array object
@@ -122,7 +120,7 @@ def get_data_to_fit(data, intensity, n_bins):
     """
     # Define centers of bins
     min_cos2 = data.cos2.min()
-    bins = np.linspace(min_cos2, 1, n_bins, endpoint=True)
+    bins = np.linspace(min_cos2, 1., n_bins, endpoint=True)
     bin_centers = np.diff(bins)/2+bins[0:-1]
     # Get data values at intensity
     val = data.loc[data.I == intensity]
