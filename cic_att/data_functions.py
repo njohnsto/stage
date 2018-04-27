@@ -155,7 +155,7 @@ def get_attenuation_parameters(s125, cos2):
 
 
 def get_attenuation_parameters2(init_params, s125_fit, s38_fit, s125_fit_error, bins):
-    """Function that performs 
+    """Function that performs
 
     Parameters
     ----------
@@ -173,7 +173,7 @@ def get_attenuation_parameters2(init_params, s125_fit, s38_fit, s125_fit_error, 
     Returns
     -------
     good_samples    : 2darray (float)
-                      MCMC samples having removed 
+                      MCMC samples having removed
                       values outside allowed region
     """
 
