@@ -226,3 +226,47 @@ def get_bootstrap_data(data):
     new_data = data.copy()
     new_data.s125 = np.random.normal(data.s125.tolist(), data.s125_error.tolist())
     return new_data
+
+
+
+def merge_and_select_data(filenames, output, number_of_files=10000):
+    """ Function that reads the original IceCube data and creates a smaller file 
+        containing just basic info after the selection
+        
+    Parameters
+    ----------
+          filenames : array of file names 
+             output : output file name
+    number_of_files : number of files to process
+    
+    Returns
+    -------
+    store: pandas HDFStore
+    
+   
+    """
+    store = pd.HDFStore(output,complib='blosc')
+    for i, file in enumerate(filenames):
+        print(i, file)
+        s = pd.HDFStore(file)
+        dataGen = s.select('Laputop')
+        dataGen.drop(dataGen.columns.difference(['Run', 'Event','x','y','z','zenith','azimuth','time']), 1, inplace=True)
+        dataRec = s.select('LaputopParams')
+        dataRec.drop(dataRec.columns.difference(['s125','beta','chi2','ndf']), 1, inplace=True)
+        dataCuts = s.select('IT73AnalysisIceTopQualityCuts')
+        dataCuts.drop(['Run', 'Event','SubEvent','SubEventStream'], 1, inplace=True)
+        dataGen = dataGen.dropna(axis=1, how='all')
+        dataRec = dataRec.dropna(axis=1, how='all')
+        data = pd.concat([dataGen, dataRec, dataCuts], axis=1, join_axes=[dataGen.index])
+        data = data.query('exists!=0 & IceTopMaxSignalInside!=0 & IceTop_reco_succeeded!=0'
+                         ' & IceTop_StandardFilter!=0 & IceTopMaxSignalInside !=0 '
+                         ' & Laputop_FractionContainment!=0 & BetaCutPassed!=0 &s125>1')
+        data.drop(data.columns.difference(['Run','Event','x','y','z','zenith','azimuth',
+                                          's125','beta','chi2','ndf']), axis=1,inplace=True)
+    
+        store.append(key ='data', value=data,  format='t',chunksize=200000)
+        s.close()
+        if i>number_of_files:
+            break
+
+    return store
