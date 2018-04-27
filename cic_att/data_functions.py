@@ -115,8 +115,6 @@ def get_data_to_fit(data, intensity, n_bins):
                       s125 values to fit
     s125_fit_error  : array (float)
                       associated uncertainties
-    s38_fit         : array (float)
-                      s38 values to fit
     bin_centers     : array (float)
                       centers of cosine**2 bins
     """
@@ -127,10 +125,9 @@ def get_data_to_fit(data, intensity, n_bins):
     # Get data values at intensity
     val = data.loc[data.I == intensity]
     s125_fit = np.asarray(val.s125.tolist())
-    s38_fit = np.asarray(val.s38.tolist())
     s125_fit_error = np.asarray(val.s125_error.tolist())
     # introduce checks for intensity
-    return (s125_fit, bin_centers, s38_fit, s125_fit_error)
+    return (s125_fit, bin_centers, s125_fit_error)
 
 
 def get_attenuation_parameters(s125, cos2):
@@ -154,7 +151,7 @@ def get_attenuation_parameters(s125, cos2):
     return (parameters, cov2)
 
 
-def get_attenuation_parameters2(init_params, s125_fit, s38_fit, s125_fit_error, bins):
+def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
     """Function that performs 
 
     Parameters
@@ -165,8 +162,6 @@ def get_attenuation_parameters2(init_params, s125_fit, s38_fit, s125_fit_error, 
                       s125 values to fit
     s125_fit_error  : array (float)
                       associated uncertainties
-    s38_fit         : array (float)
-                      s38 values to fit
     bin_centers     : array (float)
                       centers of cosine**2 bins
 

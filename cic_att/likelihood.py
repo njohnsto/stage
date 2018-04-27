@@ -32,7 +32,7 @@ def lnprior(params):
              Function parameters
     """
     a, b, f = params
-    if -2.0 < b < 0. and 0. < a < 1.5 and 0. < f:
+    if -5.0 < b < 0. and 0. < a < 5 and 0. < f:
         return 0.0
 
     return -np.inf
