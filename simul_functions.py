@@ -127,12 +127,14 @@ def get_attenuation_parameters2(s125_fit,s38_fit,s125_fit_error, bins, performMC
             #print(lnprior(sample[i]),sample[i],'outside if')
             if lnprior(sample[i])!=-np.inf:
                 sample2.append(sample[i])
-            print(sample2[i])
-            
+            print(sample[i], lnprior(sample[i]))
+            #print(sample2[i])
+        sample2=np.asarray(sample2)
+        print(type(sample),type(sample2),sample2.shape)    
         print("Life is amazing")
-        for a, b,f in sample[np.random.randint(len(sample), size=100)]:
+        for a, b,f in sample2[np.random.randint(len(sample2), size=100)]:
             plt.plot(cos2, f*(b*cos2**2+a*cos2+1), color="k", alpha=0.1)
-        plt.plot(cos2, s38_fit*(b_true*cos2**2+a_true*cos2+1), color="r", lw=2, alpha=0.8)
+        plt.plot(cos2, f_true*(b_true*cos2**2+a_true*cos2+1), color="r", lw=2, alpha=0.8)
         plt.errorbar(cos2, y, yerr=s125_fit_error, fmt=".k")
         
     return (parameters, cov2, sample, sample2)
