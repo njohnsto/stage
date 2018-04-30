@@ -61,9 +61,9 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
     return data
 
 
-def set_intensity(data, n_bins):
+def set_intensity_old(data, n_bins):
     """Function that calculates the intensity for each group
-
+      ***** very slow *****
     Parameters
     ----------
     data  : pandas array
@@ -91,6 +91,43 @@ def set_intensity(data, n_bins):
     return (data,groups)
 
 
+def set_intensity(data, n_bins):
+    """Function that calculates the intensity for each group
+        
+    Parameters
+    ----------
+    data  : pandas array
+           Pandas data array object
+    n_bins : int
+           number of bins for grouping
+
+    Returns
+    -------
+    data : pandas array
+    groups: the groups that were creating acording with the binning
+    """
+    # Define cosine squared bins
+    min_cos2 = data.cos2.min()
+    cos2_bins = np.linspace(min_cos2, 1, n_bins, endpoint=True)
+
+    # sort data by S125 values
+    data.sort_values(['s125'], ascending = False, inplace = True)
+
+    # Bin and group by cosine ^ 2
+    ind = np.digitize(data['cos2'], cos2_bins)
+    groups = data.groupby(ind)
+    for name, group in groups:
+        initial_ind = group.I.index.tolist()
+        test = group.copy()
+        test.sort_values(['s125'], ascending= False, inplace = True)
+        test.reset_index(inplace=True)
+        test.drop(['index', 'level_0'], axis= 1, inplace=True)
+        data.loc[initial_ind, 'I'] = test.index.tolist()
+    return (data, groups)
+
+    
+    
+
 def get_data_to_fit(data, intensity, n_bins):
     """Function that extracts requested data based
        on intensity, and bins in cosine**2 in
@@ -107,23 +144,27 @@ def get_data_to_fit(data, intensity, n_bins):
 
     Returns
     -------
-    s125_fit        : array (float)
-                      s125 values to fit
-    s125_fit_error  : array (float)
-                      associated uncertainties
-    bin_centers     : array (float)
-                      centers of cosine**2 bins
+    vals      : the values in the DataFrame that correspond to a certain intensity
+                Pandas data array object 
     """
     # Define centers of bins
     min_cos2 = data.cos2.min()
     bins = np.linspace(min_cos2, 1., n_bins, endpoint=True)
     bin_centers = np.diff(bins)/2+bins[0:-1]
+    bin_width = np.diff(bins)/2.
     # Get data values at intensity
-    val = data.loc[data.I == intensity]
-    s125_fit = np.asarray(val.s125.tolist())
-    s125_fit_error = np.asarray(val.s125_error.tolist())
+    vals = data.loc[data.I == intensity].copy()
+    for value in vals.cos2:
+        print (value)
+        idx = np.searchsorted(bins, value, side="left")
+        vals.cos2.loc[vals["cos2"] == value] = bins[idx]-bin_width[0]
+        print (idx)
+         
+        
+    s125_fit = np.asarray(vals.s125.tolist())
+    s125_fit_error = np.asarray(vals.s125_error.tolist())
     # introduce checks for intensity
-    return (val, s125_fit, bin_centers, s125_fit_error)
+    return vals
 
 
 def get_attenuation_parameters(s125, cos2):
@@ -195,6 +236,9 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
     for i in range(0, 5000-500):
         if lnprior(all_samples[i]) != -np.inf:
             good_samples.append(all_samples[i])
+            print('Good sample')
+        else:
+            print('Bad sample')
     good_samples = np.asarray(good_samples)
     print("Life is amazing")
 
