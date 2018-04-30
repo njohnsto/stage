@@ -81,8 +81,8 @@ def get_s125(cos2, alpha, beta, ref_signal):
                 Signal at 125 parametrized
     """
 
-    # Center cosine **2 values on cosine(38)**2
-    cos2_ref = np.cos(math.radians(38))**2
+    # Center cosine **2 values on cosine(25)**2
+    cos2_ref = np.cos(math.radians(25))**2
     x = cos2 - cos2_ref
 
     s_125 = ref_signal * (1 + alpha*x + beta*x**2)
