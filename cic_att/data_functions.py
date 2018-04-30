@@ -235,12 +235,8 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
     for i in range(0, 5000-500):
         if lnprior(all_samples[i]) != -np.inf:
             good_samples.append(all_samples[i])
-            print('Good sample')
-        else:
-            print('Bad sample')
     good_samples = np.asarray(good_samples)
-    print("Life is amazing")
-
+  
     return good_samples
 
 
