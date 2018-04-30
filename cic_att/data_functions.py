@@ -85,12 +85,10 @@ def set_intensity(data, n_bins):
     # Bin and group by cosine ^ 2
     ind = np.digitize(data['cos2'], cos2_bins)
     groups = data.groupby(ind)
-
     for name, group in groups:
         values = group['s125'].apply(lambda x: group[group['s125'] > x].count())
         data.loc[group.I.index.tolist(), 'I'] = values.I
-
-    return data
+    return (data,groups)
 
 
 def get_data_to_fit(data, intensity, n_bins):
@@ -125,7 +123,7 @@ def get_data_to_fit(data, intensity, n_bins):
     s125_fit = np.asarray(val.s125.tolist())
     s125_fit_error = np.asarray(val.s125_error.tolist())
     # introduce checks for intensity
-    return (s125_fit, bin_centers, s125_fit_error)
+    return (val, s125_fit, bin_centers, s125_fit_error)
 
 
 def get_attenuation_parameters(s125, cos2):
