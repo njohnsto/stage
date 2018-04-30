@@ -154,11 +154,10 @@ def get_data_to_fit(data, intensity, n_bins):
     bin_width = np.diff(bins)/2.
     # Get data values at intensity
     vals = data.loc[data.I == intensity].copy()
+    vals['cos2_index'] = 0 
     for value in vals.cos2:
-        print (value)
         idx = np.searchsorted(bins, value, side="left")
         vals.cos2.loc[vals["cos2"] == value] = bins[idx]-bin_width[0]
-        print (idx)
          
         
     s125_fit = np.asarray(vals.s125.tolist())
