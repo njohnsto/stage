@@ -61,9 +61,9 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
     return data
 
 
-def set_intensity(data, n_bins):
+def set_intensity_old(data, n_bins):
     """Function that calculates the intensity for each group
-
+      ***** very slow *****
     Parameters
     ----------
     data  : pandas array
@@ -91,6 +91,43 @@ def set_intensity(data, n_bins):
     return (data,groups)
 
 
+def set_intensity(data, n_bins, variable='s125'):
+    """Function that calculates the intensity for each group
+        
+    Parameters
+    ----------
+    data  : pandas array
+           Pandas data array object
+    n_bins : int
+           number of bins for grouping
+
+    Returns
+    -------
+    data : pandas array
+    groups: the groups that were creating acording with the binning
+    """
+    # Define cosine squared bins
+    min_cos2 = data.cos2.min()
+    cos2_bins = np.linspace(min_cos2, 1, n_bins, endpoint=True)
+
+    # sort data by S125 values
+    data.sort_values([variable], ascending = False, inplace = True)
+
+    # Bin and group by cosine ^ 2
+    ind = np.digitize(data['cos2'], cos2_bins)
+    groups = data.groupby(ind)
+    for name, group in groups:
+        initial_ind = group.I.index.tolist()
+        test = group.copy()
+        test.sort_values([variable], ascending= False, inplace = True)
+        test.reset_index(inplace=True)
+        test.drop(['index', 'level_0'], axis= 1, inplace=True)
+        data.loc[initial_ind, 'I'] = test.index.tolist()
+    return (data, groups)
+
+    
+    
+
 def get_data_to_fit(data, intensity, n_bins):
     """Function that extracts requested data based
        on intensity, and bins in cosine**2 in
@@ -107,23 +144,26 @@ def get_data_to_fit(data, intensity, n_bins):
 
     Returns
     -------
-    s125_fit        : array (float)
-                      s125 values to fit
-    s125_fit_error  : array (float)
-                      associated uncertainties
-    bin_centers     : array (float)
-                      centers of cosine**2 bins
+    vals      : the values in the DataFrame that correspond to a certain intensity
+                Pandas data array object 
     """
     # Define centers of bins
     min_cos2 = data.cos2.min()
     bins = np.linspace(min_cos2, 1., n_bins, endpoint=True)
     bin_centers = np.diff(bins)/2+bins[0:-1]
+    bin_width = np.diff(bins)/2.
     # Get data values at intensity
-    val = data.loc[data.I == intensity]
-    s125_fit = np.asarray(val.s125.tolist())
-    s125_fit_error = np.asarray(val.s125_error.tolist())
+    vals = data.loc[data.I == intensity].copy()
+    vals['cos2_index'] = 0 
+    for value in vals.cos2:
+        idx = np.searchsorted(bins, value, side="left")
+        vals.cos2.loc[vals["cos2"] == value] = bins[idx]-bin_width[0]
+         
+        
+    s125_fit = np.asarray(vals.s125.tolist())
+    s125_fit_error = np.asarray(vals.s125_error.tolist())
     # introduce checks for intensity
-    return (val, s125_fit, bin_centers, s125_fit_error)
+    return vals
 
 
 def get_attenuation_parameters(s125, cos2):
@@ -147,7 +187,7 @@ def get_attenuation_parameters(s125, cos2):
     return (parameters, cov2)
 
 
-def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
+def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, cos2):
     """Function that performs 
 
     Parameters
@@ -158,7 +198,7 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
                       s125 values to fit
     s125_fit_error  : array (float)
                       associated uncertainties
-    bin_centers     : array (float)
+    cos2            : array (float)
                       centers of cosine**2 bins
 
     Returns
@@ -172,32 +212,31 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, bins):
     a_true = init_params[0]
     b_true = init_params[1]
     f_true = init_params[2]
-    y = get_s125(bins, a_true, b_true, f_true)
+    y = get_s125(cos2, a_true, b_true, f_true)
 
-    # Recenter cosine**2 to 38 deg
-    cos_ref = np.cos(math.radians(38))**2
-    cos2 = bins - cos_ref
+    # Recenter cosine**2 to 25 deg
+    cos_ref = np.cos(math.radians(25))**2
+    cos2 = cos2 - cos_ref
     # Minimize negative log-likelihood function
-    nll = lambda *args: -lnlike(*args)
-    result = sp.optimize.minimize(nll, [a_true, b_true, f_true], args=(cos2, y, s125_fit_error))
+    #nll = lambda *args: -lnlike(*args)
+    #result = sp.optimize.minimize(nll, [a_true, b_true, f_true], args=(cos2, y, s125_fit_error))
 
     # Prep for emcee
     ndim, nwalkers = 3, 100
     # Set starting positions wiggled normally around min nll estimate
-    pos = [result['x'] * np.random.randn(ndim) for i in range(nwalkers)]
+    pos = [init_params+ np.random.randn(ndim)*0.1 for i in range(nwalkers)]
     sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, y, s125_fit_error))
 
     # Run emcee, get samples
-    sampler.run_mcmc(pos, 5000)
-    all_samples = sampler.chain[:, 500:, :].reshape((-1, ndim))
+    sampler.run_mcmc(pos, 2000)
+    all_samples = sampler.chain[:, 100:, :].reshape((-1, ndim))
     good_samples = []
     # Remove burn-in and samples outside of allowed prior bounds
-    for i in range(0, 5000-500):
+    for i in range(0, 2000-100):
         if lnprior(all_samples[i]) != -np.inf:
             good_samples.append(all_samples[i])
     good_samples = np.asarray(good_samples)
-    print("Life is amazing")
-
+  
     return good_samples
 
 
@@ -261,3 +300,32 @@ def merge_and_select_data(filenames, output, number_of_files=10000):
             break
 
     return store
+
+from tqdm import tqdm
+
+
+def provide_bootstrap_data(data, samples, bins, intensity):
+    result = []
+    for i in tqdm(range(samples)):
+        rand_data = get_bootstrap_data(data)
+        rand_data, groups = set_intensity(rand_data, bins)
+        rand_vals = get_data_to_fit(rand_data, intensity, 10)
+        result.append(rand_vals)    
+        #print(rand_vals)
+    return pd.concat(result)
+
+def obtain_attenuation(data, n_bins,  intensity, samples= 200):
+    
+    df = provide_bootstrap_data(data, samples, n_bins, intensity)
+    groups = df.groupby(['cos2'])
+    params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean())
+    # Use as guess
+    a_true = params_scipy[0]
+    b_true = params_scipy[1]
+    f_true = params_scipy[2]
+    sample = get_attenuation_parameters2(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
+    
+    return (sample, groups)
+    
+    
+    

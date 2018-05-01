@@ -29,7 +29,7 @@ alpha = 0.919
 beta = -1.13
 
 # Maximum zenith angle in degrees
-maxTheta = 50.
+maxTheta = 45.
 
 #number of events to generate
 events = 10000
