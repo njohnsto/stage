@@ -7,3 +7,6 @@ from .data_functions import get_bootstrap_data
 from .data_functions import get_attenuation_parameters2
 from .data_functions import generate_toy_data
 from .data_functions import set_intensity
+from .utils import get_s125
+from .utils import get_signal_ref
+from .utils import random_pl
