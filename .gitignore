@@ -1,4 +1,33 @@
-__pycache__
-.ipynb_checkpoints
-*~
+TODO
+
+# Any figures associated with analysis
 *.png
+*.pdf
+*.eps
+
+# Any pyc
+*.pyc
+
+
+# Byte-compiled / optimized / DLL files
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook
+**/.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
