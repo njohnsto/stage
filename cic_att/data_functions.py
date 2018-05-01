@@ -55,7 +55,7 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
     data['zenith'] = np.arccos(np.sqrt(data.cos2))
     data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
     data['s125'] = s125
-    data['s125_error'] = np.abs(np.random.uniform(0.05, 0.1, events) * s125)
+    data['s125_error'] = 0.1*data.s125
     data['I'] = 0
 
     return data
