@@ -12,29 +12,30 @@ from utils import random_pl, get_signal_ref, get_s125
 from likelihood import lnlike, lnprior, lnprob
 
 
-def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
+def generate_toy_data(events, inp):
     """Function that generates simulated data given predefined input
 
     Parameters
     ----------
     events    : int
                 Number of events to simulate
-    minE      : float
-                Minimum energy (eV)
-    maxE      : float
-                Maximum energy (eV)
-    gamma     : float
-                Spectral index
-    A         : float
-                Reference energy (eV)
-    B         : float
-                Relation to s38
-    alpha     : float
-                True attenuation coeff
-    beta      : float
-                True attenuation coeff
-    maxTheta  : float
-                Minimum zenith value (degrees)
+    inp : dictionary containing            
+        minE      : float
+                    Minimum energy (eV)
+        maxE      : float
+                    Maximum energy (eV)
+        gamma     : float
+                    Spectral index
+        A         : float
+                    Reference energy (eV)
+        B         : float
+                    Relation to s38
+        alpha     : float
+                    True attenuation coeff
+        beta      : float
+                    True attenuation coeff
+        maxTheta  : float
+                    Minimum zenith value (degrees)
 
     Returns
     -------
@@ -42,10 +43,10 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
            Pandas array with simulated data
     """
     # Random energy samples from power law
-    energy = random_pl(minE, maxE, gamma, events)
-    s38 = get_signal_ref(A, B, energy)
-    cos2 = np.random.uniform(np.cos(math.radians(maxTheta))**2, 1, events)
-    s125 = get_s125(cos2, alpha, beta, s38)
+    energy = random_pl(inp['minE'], inp['maxE'], inp['gamma'], events)
+    s38 = get_signal_ref(inp['A'], inp['B'], energy)
+    cos2 = np.random.uniform(np.cos(math.radians(inp['maxTheta']))**2, 1, events)
+    s125 = get_s125(cos2, inp['alpha'], inp['beta'], s38)
 
     # Define & fill pandas data array object
     data = pd.DataFrame()
@@ -54,8 +55,8 @@ def generate_toy_data(events, minE, maxE, gamma, A, B, alpha, beta, maxTheta):
     data['s38'] = s38
     data['zenith'] = np.arccos(np.sqrt(data.cos2))
     data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
-    data['s125'] = s125
-    data['s125_error'] = 0.1*data.s125
+    data['s125'] = s125+ np.random.randn(len(s125))*s125*0.1
+    data['s125_error'] = 0.1*s125
     data['I'] = 0
 
     return data
@@ -166,28 +167,9 @@ def get_data_to_fit(data, intensity, n_bins):
     return vals
 
 
-def get_attenuation_parameters(s125, cos2):
-    """Function that performs a s125 parametrization fit with scipy
-
-    Parameters
-    ----------
-    s125 : array (float)
-           S125 values
-    cos2 : array (float)
-           associated cosine**2 values
-
-    Returns
-    -------
-    parameters  : list (float)
-                  best fit parameters
-    cov2        : 2darray (float)
-                  covariance matrix
-    """
-    parameters, cov2 = sp.optimize.curve_fit(get_s125, cos2, s125)
-    return (parameters, cov2)
 
 
-def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, cos2):
+def get_attenuation_parameters(init_params, s125_fit, s125_fit_error, cos2):
     """Function that performs 
 
     Parameters
@@ -207,7 +189,7 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, cos2):
                       MCMC samples having removed
                       values outside allowed region
     """
-
+    
     # Use as guess
     a_true = init_params[0]
     b_true = init_params[1]
@@ -222,17 +204,17 @@ def get_attenuation_parameters2(init_params, s125_fit, s125_fit_error, cos2):
     #result = sp.optimize.minimize(nll, [a_true, b_true, f_true], args=(cos2, y, s125_fit_error))
 
     # Prep for emcee
-    ndim, nwalkers = 3, 100
+    ndim, nwalkers = 3, 50
     # Set starting positions wiggled normally around min nll estimate
-    pos = [init_params+ np.random.randn(ndim)*0.1 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, y, s125_fit_error))
+    pos = [init_params+ np.random.randn(ndim)*0.2 for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, y, s125_fit_error), threads=10)
 
     # Run emcee, get samples
     sampler.run_mcmc(pos, 2000)
-    all_samples = sampler.chain[:, 100:, :].reshape((-1, ndim))
+    all_samples = sampler.chain[:, 50:, :].reshape((-1, ndim))
     good_samples = []
     # Remove burn-in and samples outside of allowed prior bounds
-    for i in range(0, 2000-100):
+    for i in range(0, 2000-50):
         if lnprior(all_samples[i]) != -np.inf:
             good_samples.append(all_samples[i])
     good_samples = np.asarray(good_samples)
@@ -342,7 +324,7 @@ def obtain_attenuation(data, n_bins,  intensity, samples= 200):
     a_true = params_scipy[0]
     b_true = params_scipy[1]
     f_true = params_scipy[2]
-    sample = get_attenuation_parameters2(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
+    sample = get_attenuation_parameters(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
     
     return (sample, groups)
     
