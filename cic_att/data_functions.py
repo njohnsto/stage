@@ -121,7 +121,7 @@ def set_intensity(data, n_bins, variable='s125'):
         test = group.copy()
         test.sort_values([variable], ascending= False, inplace = True)
         test.reset_index(inplace=True)
-        test.drop(['index', 'level_0'], axis= 1, inplace=True)
+        test.drop(['index'], axis= 1, inplace=True)
         data.loc[initial_ind, 'I'] = test.index.tolist()
     return (data, groups)
 
