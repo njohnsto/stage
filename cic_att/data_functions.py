@@ -305,11 +305,30 @@ from tqdm import tqdm
 
 
 def provide_bootstrap_data(data, samples, bins, intensity):
+    """Function that provides bootstrap data
+        
+    Parameters
+    ----------
+    data  : pandas array, initial data
+           Pandas data array object
+    samples : int
+           number of of samples to be drawn
+    bins: int 
+          as usual number of bins
+    intensity: int      
+             the intensity at which the attenuation is obtained
+    Returns
+    -------
+    result : pandas array
+             values from the bootstrap
+    """
+  
+
     result = []
     for i in tqdm(range(samples)):
         rand_data = get_bootstrap_data(data)
         rand_data, groups = set_intensity(rand_data, bins)
-        rand_vals = get_data_to_fit(rand_data, intensity, 10)
+        rand_vals = get_data_to_fit(rand_data, intensity, bins)
         result.append(rand_vals)    
         #print(rand_vals)
     return pd.concat(result)
