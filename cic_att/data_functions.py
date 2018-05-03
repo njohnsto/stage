@@ -315,18 +315,25 @@ def provide_bootstrap_data(data, samples, bins, intensity):
         #print(rand_vals)
     return pd.concat(result)
 
-def obtain_attenuation(data, n_bins,  intensity, samples= 200):
-    
+
+def obtain_attenuation(data, n_bins, intensity, samples=200, doMCMC=False):
+
+    results_dict = {}
+
     df = provide_bootstrap_data(data, samples, n_bins, intensity)
     groups = df.groupby(['cos2'])
     params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean())
-    # Use as guess
-    a_true = params_scipy[0]
-    b_true = params_scipy[1]
-    f_true = params_scipy[2]
-    sample = get_attenuation_parameters(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
     
-    return (sample, groups)
+    fit_dic["params"] = params_scipy
+    fit_dic["err"] = np.sqrt(np.diag(cov2))
+
+    sample_mcmc = []
+    if (doMCMC):
+        sample_mcmc = get_attenuation_parameters(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
+
+    results_dict["mcmc"] = sample_mcmc
+
+    return (results_dict, groups)
     
     
     
