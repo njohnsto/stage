@@ -322,10 +322,11 @@ def obtain_attenuation(data, n_bins, intensity, samples=200, doMCMC=False):
 
     df = provide_bootstrap_data(data, samples, n_bins, intensity)
     groups = df.groupby(['cos2'])
-    params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean())
+    params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean(),
+                                               sigma = groups.s125.std())
     
-    fit_dic["params"] = params_scipy
-    fit_dic["err"] = np.sqrt(np.diag(cov2))
+    results_dict["params"] = params_scipy
+    results_dict["err"] = np.sqrt(np.diag(cov2))
 
     sample_mcmc = []
     if (doMCMC):
