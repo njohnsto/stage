@@ -59,6 +59,11 @@ def generate_toy_data(events, inp):
     data['s125_error'] = 0.1*s125
     data['I'] = 0
 
+    
+    #data.drop(data.columns.difference(['s125', 's125_error',"cos2", "I","zenith"]), 1, inplace= True)
+    #data= data.loc[data.s125>4]
+    #data= data.loc[data.cos2>0.5]  
+    #data.reset_index(inplace=True)
     return data
 
 
@@ -322,8 +327,7 @@ def obtain_attenuation(data, n_bins, intensity, samples=200, doMCMC=False):
 
     df = provide_bootstrap_data(data, samples, n_bins, intensity)
     groups = df.groupby(['cos2'])
-    params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean(),
-                                               sigma = groups.s125.std())
+    params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean(),sigma = groups.s125.std())
     
     results_dict["params"] = params_scipy
     results_dict["err"] = np.sqrt(np.diag(cov2))
