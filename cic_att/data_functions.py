@@ -10,7 +10,7 @@ import emcee
 
 from utils import random_pl, get_signal_ref, get_s125
 from likelihood import lnlike, lnprior, lnprob
-
+from tqdm import tqdm, trange
 
 def generate_toy_data(events, inp):
     """Function that generates simulated data given predefined input
@@ -155,7 +155,7 @@ def get_data_to_fit(data, intensity, n_bins):
     bin_width = np.diff(bins)/2.
     # Get data values at intensity
     vals = data.loc[data.I == intensity].copy()
-    vals['cos2_index'] = 0 
+    vals.loc[:,'cos2_index'] = 0 
     for value in vals.cos2:
         idx = np.searchsorted(bins, value, side="left")
         vals.cos2.loc[vals["cos2"] == value] = bins[idx]-bin_width[0]
@@ -169,7 +169,7 @@ def get_data_to_fit(data, intensity, n_bins):
 
 
 
-def get_attenuation_parameters(init_params, s125_fit, s125_fit_error, cos2):
+def get_attenuation_parameters(init_params, init_errors, s125_fit, s125_fit_error, cos2):
     """Function that performs 
 
     Parameters
@@ -195,7 +195,7 @@ def get_attenuation_parameters(init_params, s125_fit, s125_fit_error, cos2):
     b_true = init_params[1]
     f_true = init_params[2]
     y = get_s125(cos2, a_true, b_true, f_true)
-
+    
     # Recenter cosine**2 to 25 deg
     cos_ref = np.cos(math.radians(25))**2
     cos2 = cos2 - cos_ref
@@ -204,10 +204,10 @@ def get_attenuation_parameters(init_params, s125_fit, s125_fit_error, cos2):
     #result = sp.optimize.minimize(nll, [a_true, b_true, f_true], args=(cos2, y, s125_fit_error))
 
     # Prep for emcee
-    ndim, nwalkers = 3, 50
+    ndim, nwalkers = 3, 75
     # Set starting positions wiggled normally around min nll estimate
-    pos = [init_params+ np.random.randn(ndim)*0.2 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, y, s125_fit_error), threads=10)
+    pos = [init_params+ np.random.randn(ndim)*init_errors*2 for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, s125_fit, s125_fit_error), threads=10)
 
     # Run emcee, get samples
     sampler.run_mcmc(pos, 2000)
@@ -258,33 +258,36 @@ def merge_and_select_data(filenames, output, number_of_files=10000):
    
     """
     store = pd.HDFStore(output,complib='blosc')
-    for i, file in enumerate(filenames):
-        print(i, file)
-        s = pd.HDFStore(file)
-        dataGen = s.select('Laputop')
-        dataGen.drop(dataGen.columns.difference(['Run', 'Event','x','y','z','zenith','azimuth','time']), 1, inplace=True)
-        dataRec = s.select('LaputopParams')
-        dataRec.drop(dataRec.columns.difference(['s125','beta','chi2','ndf']), 1, inplace=True)
-        dataCuts = s.select('IT73AnalysisIceTopQualityCuts')
-        dataCuts.drop(['Run', 'Event','SubEvent','SubEventStream'], 1, inplace=True)
-        dataGen = dataGen.dropna(axis=1, how='all')
-        dataRec = dataRec.dropna(axis=1, how='all')
-        data = pd.concat([dataGen, dataRec, dataCuts], axis=1, join_axes=[dataGen.index])
-        data = data.query('exists!=0 & IceTopMaxSignalInside!=0 & IceTop_reco_succeeded!=0'
-                         ' & IceTop_StandardFilter!=0 & IceTopMaxSignalInside !=0 '
-                         ' & Laputop_FractionContainment!=0 & BetaCutPassed!=0 &s125>1')
-        data.drop(data.columns.difference(['Run','Event','x','y','z','zenith','azimuth',
-                                          's125','beta','chi2','ndf']), axis=1,inplace=True)
+    for i, file in enumerate(tqdm(filenames)):
+        
+        try:
+            s = pd.HDFStore(file)
+            dataGen = s.select('Laputop')
+            dataGen.drop(dataGen.columns.difference(['Run', 'Event','x','y','z','zenith','azimuth','time']), 1, inplace=True)
+            dataRec = s.select('LaputopParams')
+            dataRec.drop(dataRec.columns.difference(['s125','beta','chi2','ndf']), 1, inplace=True)
+            dataCuts = s.select('IT73AnalysisIceTopQualityCuts')
+            dataCuts.drop(['Run', 'Event','SubEvent','SubEventStream'], 1, inplace=True)
+            dataGen = dataGen.dropna(axis=1, how='all')
+            dataRec = dataRec.dropna(axis=1, how='all')
+            data = pd.concat([dataGen, dataRec, dataCuts], axis=1, join_axes=[dataGen.index])
+            data = data.query('exists!=0 & IceTopMaxSignalInside!=0 & IceTop_reco_succeeded!=0'
+                             ' & IceTop_StandardFilter!=0 & IceTopMaxSignalInside !=0 '
+                             ' & Laputop_FractionContainment!=0 & BetaCutPassed!=0 &s125>1')
+            data.drop(data.columns.difference(['Run','Event','x','y','z','zenith','azimuth',
+                                              's125','beta','chi2','ndf']), axis=1,inplace=True)
     
-        store.append(key ='data', value=data,  format='t',chunksize=200000)
-        s.close()
+            store.append(key ='data', value=data,  format='t',chunksize=200000)
+            s.close()
+        except:
+            print(i, file)
+            
         if i>number_of_files:
             break
 
     return store
 
-from tqdm import tqdm
-
+from tqdm import trange
 
 def provide_bootstrap_data(data, samples, bins, intensity):
     """Function that provides bootstrap data
@@ -307,7 +310,9 @@ def provide_bootstrap_data(data, samples, bins, intensity):
   
 
     result = []
-    for i in tqdm(range(samples)):
+#    for i in trange(samples, desc='boot loop', leave=True):
+    for i in range(samples):
+    
         rand_data = get_bootstrap_data(data)
         rand_data, groups = set_intensity(rand_data, bins)
         rand_vals = get_data_to_fit(rand_data, intensity, bins)
@@ -325,12 +330,15 @@ def obtain_attenuation(data, n_bins, intensity, samples=200, doMCMC=False):
     params_scipy, cov2 = sp.optimize.curve_fit(get_s125, groups.cos2.mean(), groups.s125.mean(),
                                                sigma = groups.s125.std())
     
+    
+    
     results_dict["params"] = params_scipy
     results_dict["err"] = np.sqrt(np.diag(cov2))
 
     sample_mcmc = []
     if (doMCMC):
-        sample_mcmc = get_attenuation_parameters(params_scipy, groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
+        sample_mcmc = get_attenuation_parameters(params_scipy, np.sqrt(np.diag(cov2)),
+                                                 groups.s125.mean(), groups.s125.std(), groups.cos2.mean())
 
     results_dict["mcmc"] = sample_mcmc
 
