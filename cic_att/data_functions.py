@@ -11,6 +11,62 @@ import emcee
 from utils import random_pl, get_signal_ref, get_s125
 from likelihood import lnlike, lnprior, lnprob
 from tqdm import tqdm, trange
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+
+def get_attenuation_values(results, output_file, mcmc=True):
+   
+    fig, ax =plt.subplots()
+
+    cos_ref = np.cos(math.radians(25))**2
+    cos2 = np.linspace(0.5, 1, 20)-cos_ref
+    vals = pd.DataFrame(columns= ["a", "aer1", "aer2", "b", "ber1", "ber2", "s", "ser", "ser2", "I"])
+    colors = ["r", "b","r", "b","r", "b","r", "b","r", "b","r", "b","r", "b","r", "b","r", "b","r", "b"]
+    for i, key in enumerate(sorted(results)):
+        sample = results[key][0]['mcmc']
+        params = results[key][0]['params']
+        error = results[key][0]['err']
+        groups = results[key][1]
+        if mcmc:
+            try:
+                a_mcmc,  b_mcmc,  s38_mcmc  = map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]),
+                                              zip(*np.percentile(sample, [16, 50, 84],
+                                                  axis=0)))
+            except:
+                print("MCMC not available")
+                continue
+            
+            for a, b, f in sample[np.random.randint(len(sample), size=40)]:
+                ax.plot(cos2, f * (b * cos2**2 + a * cos2 + 1), color=colors[i], alpha=0.03)
+        else:
+            a_mcmc = (params[0], error[0], error[0])
+            b_mcmc = (params[1], error[1], error[1])
+            s38_mcmc = (params[2], error[2], error[2])
+        vals = vals.append({"a":a_mcmc[0], "aer1":a_mcmc[1], "aer2":a_mcmc[2], 
+                            "b":b_mcmc[0], "ber1":b_mcmc[1], "ber2":b_mcmc[2],
+                            "s":s38_mcmc[0], "ser":s38_mcmc[1], "ser2":s38_mcmc[2],
+                            "I":key},
+                            ignore_index = True)
+        
+        ax.errorbar(groups.cos2.mean()-cos_ref, groups.s125.mean(), 
+                    yerr= groups.s125.std().tolist(), label ="S_{ref} %s"%int(s38_mcmc[0]), 
+                    color = colors[i], fmt=".")
+    
+        ax.plot(cos2, s38_mcmc[0]*(b_mcmc[0] * cos2**2 + a_mcmc[0] * cos2 + 1), lw=1, 
+                color = colors[i], alpha=0.8) 
+
+        
+    ax.set_yscale("log", nonposy='clip')
+    ax.set_xlim(0.5-cos_ref, 1-cos_ref)
+    ax.set_ylim(200, 5000)
+    plt.xlabel(r"$\mathrm{cos}^{2} \theta - \mathrm{cos}^{2} 25^{\circ}$", fontsize=30)
+    plt.ylabel("$\mathrm{S}_{125} [VEM]$", fontsize=30)
+
+    ax.legend( bbox_to_anchor=(1.01, 1), loc=2, borderaxespad=0.)    
+    plt.savefig(output_file)
+
+    return vals
+
 
 def generate_toy_data(events, inp):
     """Function that generates simulated data given predefined input
@@ -55,7 +111,7 @@ def generate_toy_data(events, inp):
     data['s38'] = s38
     data['zenith'] = np.arccos(np.sqrt(data.cos2))
     data['zenith_er'] = np.random.uniform(math.radians(0.5), math.radians(1.5), events)
-    data['s125'] = s125+ np.random.randn(len(s125))*s125*0.1
+    data['s125'] = s125 #+ np.random.randn(len(s125))*s125*0.05
     data['s125_error'] = 0.1*s125
     data['I'] = 0
 
@@ -165,10 +221,6 @@ def get_data_to_fit(data, intensity, n_bins):
         idx = np.searchsorted(bins, value, side="left")
         vals.cos2.loc[vals["cos2"] == value] = bins[idx]-bin_width[0]
          
-        
-    s125_fit = np.asarray(vals.s125.tolist())
-    s125_fit_error = np.asarray(vals.s125_error.tolist())
-    # introduce checks for intensity
     return vals
 
 
@@ -209,17 +261,18 @@ def get_attenuation_parameters(init_params, init_errors, s125_fit, s125_fit_erro
     #result = sp.optimize.minimize(nll, [a_true, b_true, f_true], args=(cos2, y, s125_fit_error))
 
     # Prep for emcee
-    ndim, nwalkers = 3, 75
+    ndim, nwalkers = 3, 100
     # Set starting positions wiggled normally around min nll estimate
-    pos = [init_params+ np.random.randn(ndim)*init_errors*2 for i in range(nwalkers)]
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, s125_fit, s125_fit_error), threads=10)
+    pos = [init_params+ np.random.randn(ndim)*init_errors*5 for i in range(nwalkers)]
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, lnprob, args=(cos2, s125_fit, s125_fit_error), threads=8)
 
     # Run emcee, get samples
     sampler.run_mcmc(pos, 2000)
-    all_samples = sampler.chain[:, 50:, :].reshape((-1, ndim))
+    to_burn = 1000
+    all_samples = sampler.chain[:, to_burn:, :].reshape((-1, ndim))
     good_samples = []
     # Remove burn-in and samples outside of allowed prior bounds
-    for i in range(0, 2000-50):
+    for i in range(0, 2000-to_burn):
         if lnprior(all_samples[i]) != -np.inf:
             good_samples.append(all_samples[i])
     good_samples = np.asarray(good_samples)
