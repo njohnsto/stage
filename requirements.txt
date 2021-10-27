@@ -3,6 +3,6 @@ pandas==0.22.0
 numpy==1.14.3
 emcee==2.2.1
 scipy==1.0.1
-dask==0.17.2
+dask==2021.10.0
 tqdm==4.23.1
 corner==2.0.1
