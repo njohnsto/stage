@@ -1,6 +1,6 @@
 matplotlib==2.2.2
 pandas==0.22.0
-numpy==1.14.3
+numpy==1.22.0
 emcee==2.2.1
 scipy==1.0.1
 dask==0.17.2
